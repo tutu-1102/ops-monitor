@@ -34,6 +34,21 @@ def _connect():
         if col not in cols:
             conn.execute(f"ALTER TABLE metrics ADD COLUMN {col} REAL")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_ts ON metrics(ts)")
+    # 告警历史表（里程碑 3）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            level TEXT NOT NULL,        -- P0 / P1 / P2
+            metric TEXT NOT NULL,       -- cpu_percent / mem_percent / disk_percent
+            target TEXT,                -- 磁盘分区挂载点（如 C:\\），其他指标为空
+            threshold REAL,
+            peak_value REAL,            -- 告警期间峰值
+            started_at REAL NOT NULL,
+            ended_at REAL,              -- NULL 表示尚未恢复
+            notified INTEGER DEFAULT 0
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_started ON alerts(started_at)")
     return conn
 
 
@@ -145,3 +160,73 @@ def aggregate_range(start: float, end: float, max_points: int = 300) -> dict:
         series["net_in"].append(round(b[4] / n, 1))
         series["net_out"].append(round(b[5] / n, 1))
     return {"series": series, "raw_count": len(rows), "buckets": len(series["ts"])}
+
+
+# ===== 告警记录（里程碑 3）=====
+
+def _alert_from_row(r) -> dict:
+    return {
+        "id": r[0],
+        "level": r[1],
+        "metric": r[2],
+        "target": r[3],
+        "threshold": r[4],
+        "peak_value": r[5],
+        "started_at": r[6],
+        "ended_at": r[7],
+    }
+
+
+def create_alert(level, metric, target, threshold, peak_value) -> int:
+    """新告警入库，返回告警 id。"""
+    conn = _connect()
+    cur = conn.execute(
+        "INSERT INTO alerts (level, metric, target, threshold, peak_value, started_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (level, metric, target, threshold, peak_value, time.time()),
+    )
+    conn.commit()
+    alert_id = cur.lastrowid
+    conn.close()
+    return alert_id
+
+
+def update_alert_peak(alert_id: int, peak_value: float):
+    """持续告警期间更新峰值（不重复通知）。"""
+    conn = _connect()
+    conn.execute(
+        "UPDATE alerts SET peak_value = MAX(peak_value, ?) WHERE id = ?",
+        (peak_value, alert_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def close_alert(alert_id: int, ended_at: float):
+    """告警恢复，记录结束时间。"""
+    conn = _connect()
+    conn.execute("UPDATE alerts SET ended_at = ? WHERE id = ?", (ended_at, alert_id))
+    conn.commit()
+    conn.close()
+
+
+def active_alerts() -> list:
+    """当前未恢复的告警。"""
+    conn = _connect()
+    rows = conn.execute(
+        "SELECT id, level, metric, target, threshold, peak_value, started_at, ended_at "
+        "FROM alerts WHERE ended_at IS NULL ORDER BY started_at DESC"
+    ).fetchall()
+    conn.close()
+    return [_alert_from_row(r) for r in rows]
+
+
+def recent_alerts(limit: int = 50) -> list:
+    """最近 limit 条告警记录（含已恢复），新→旧。"""
+    conn = _connect()
+    rows = conn.execute(
+        "SELECT id, level, metric, target, threshold, peak_value, started_at, ended_at "
+        "FROM alerts ORDER BY started_at DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+    return [_alert_from_row(r) for r in rows]

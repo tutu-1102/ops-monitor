@@ -55,6 +55,9 @@
       </div>
     </section>
 
+    <!-- 活跃告警横幅（无告警时隐藏） -->
+    <section id="alert-banner" class="alert-banner hidden"></section>
+
     <!-- 主趋势图 -->
     <section class="chart-card">
       <div class="chart-title">
@@ -73,6 +76,17 @@
       <div class="chart-card">
         <div class="chart-title">磁盘分区使用率（%）</div>
         <div id="chart-disk" class="chart"></div>
+      </div>
+    </section>
+
+    <!-- 最近告警 -->
+    <section class="chart-card">
+      <div class="chart-title">
+        最近告警
+        <span class="chart-caption" id="alert-caption"></span>
+      </div>
+      <div id="alert-list" class="alert-list">
+        <div class="alert-empty">暂无告警记录</div>
       </div>
     </section>
   </main>

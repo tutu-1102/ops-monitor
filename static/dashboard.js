@@ -202,6 +202,79 @@
     }
   }
 
+  // ===== 告警渲染 =====
+  const METRIC_LABELS_JS = { cpu_percent: 'CPU 使用率', mem_percent: '内存使用率', disk_percent: '磁盘使用率' };
+
+  function fmtDateTime(ts) {
+    const d = new Date(ts * 1000);
+    return pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+
+  function fmtDuration(sec) {
+    if (sec === null || sec === undefined) return '--';
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    if (m >= 60) { const h = Math.floor(m / 60); return h + ' 小时 ' + (m % 60) + ' 分'; }
+    if (m > 0) return m + ' 分 ' + s + ' 秒';
+    return s + ' 秒';
+  }
+
+  function alertLabel(a) {
+    const base = METRIC_LABELS_JS[a.metric] || a.metric;
+    return base + (a.target ? ' (' + a.target + ')' : '');
+  }
+
+  function renderActive(alerts) {
+    const banner = document.getElementById('alert-banner');
+    if (!alerts || alerts.length === 0) {
+      banner.classList.add('hidden');
+      banner.innerHTML = '';
+      return;
+    }
+    banner.classList.remove('hidden');
+    banner.innerHTML = alerts.map((a) => {
+      const dur = Date.now() / 1000 - a.started_at;
+      return '<div class="alert-item ' + a.level.toLowerCase() + '">'
+        + '<span class="level-badge ' + a.level.toLowerCase() + '">' + a.level + '</span>'
+        + '<span>' + alertLabel(a) + ' 峰值 ' + a.peak_value + '%（阈值 ' + a.threshold + '%）</span>'
+        + '<span class="alert-meta">开始于 ' + fmtDateTime(a.started_at) + ' · 已持续 ' + fmtDuration(dur) + '</span>'
+        + '</div>';
+    }).join('');
+  }
+
+  function renderHistory(alerts) {
+    const box = document.getElementById('alert-list');
+    const cap = document.getElementById('alert-caption');
+    if (!alerts || alerts.length === 0) {
+      cap.textContent = '';
+      box.innerHTML = '<div class="alert-empty">暂无告警记录</div>';
+      return;
+    }
+    cap.textContent = '最近 ' + alerts.length + ' 条';
+    box.innerHTML = alerts.map((a) => {
+      const active = a.ended_at === null;
+      const dur = active ? (Date.now() / 1000 - a.started_at) : (a.ended_at - a.started_at);
+      return '<div class="alert-row">'
+        + '<span class="level-badge ' + a.level.toLowerCase() + '">' + a.level + '</span>'
+        + '<span>' + alertLabel(a) + ' · 峰值 ' + a.peak_value + '% / 阈值 ' + a.threshold + '%</span>'
+        + '<span class="alert-time">' + fmtDateTime(a.started_at) + ' ~ ' + (active ? '持续中' : fmtDateTime(a.ended_at)) + '</span>'
+        + '<span class="alert-status ' + (active ? 'active' : 'ok') + '">' + (active ? '● 告警中' : '● 已恢复') + '</span>'
+        + '</div>';
+    }).join('');
+  }
+
+  async function loadAlerts() {
+    try {
+      const results = await Promise.all([
+        fetchJson('/api/alerts/active'),
+        fetchJson('/api/alerts?limit=10'),
+      ]);
+      renderActive(results[0]);
+      renderHistory(results[1]);
+    } catch (e) {
+      /* 告警区加载失败不影响指标展示 */
+    }
+  }
+
   // ===== 轮询 =====
   async function loadLatest() {
     try {
@@ -242,5 +315,7 @@
   // ===== 启动 =====
   loadLatest();
   setInterval(loadLatest, CARD_REFRESH);
+  loadAlerts();
+  setInterval(loadAlerts, 5000);
   setRange('realtime');
 })();

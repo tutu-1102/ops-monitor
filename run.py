@@ -7,14 +7,16 @@
 """
 import threading
 import time
+import alert
 import config
 import collector
 import storage
 
 
 def collect_loop():
-    """后台采集线程：每隔 COLLECT_INTERVAL 秒采集并入库。"""
+    """后台采集线程：每隔 COLLECT_INTERVAL 秒采集、入库、告警检查。"""
     c = collector.Collector()
+    engine = alert.AlertEngine()
     # 首次采集用于初始化网络速率基线（不准确，直接丢弃）
     c.collect()
     last_cleanup = time.time()
@@ -24,6 +26,12 @@ def collect_loop():
         storage.save(metric)
         print(f"[采集] CPU={metric['cpu_percent']}% 内存={metric['mem_percent']}% "
               f"磁盘={metric['disks']}", flush=True)
+
+        # 告警检查单独 try/except：告警模块出问题绝不能拖垮采集主链路
+        try:
+            engine.check(metric)
+        except Exception as e:
+            print(f"[告警引擎] 检查异常（不影响采集）: {e}", flush=True)
 
         # 每天清理一次过期数据
         if time.time() - last_cleanup > 86400:

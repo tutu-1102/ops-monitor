@@ -52,5 +52,18 @@ def api_range():
     return jsonify(result)
 
 
+@app.route("/api/alerts/active")
+def api_alerts_active():
+    """当前未恢复的告警。"""
+    return jsonify(storage.active_alerts())
+
+
+@app.route("/api/alerts")
+def api_alerts():
+    """最近 N 条告警记录（含已恢复），默认 50。"""
+    limit = min(int(request.args.get("limit", 50)), 500)
+    return jsonify(storage.recent_alerts(limit=limit))
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
