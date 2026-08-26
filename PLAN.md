@@ -25,8 +25,14 @@
 - 采集周期：默认 5 秒（配置可调）——周期权衡：太短增加负载，太长漏掉瞬时尖峰
 
 ### 3.2 存储（storage.py）
-- SQLite 单表 `metrics(timestamp, cpu_percent, mem_percent, disk_json, net_json)`
+- SQLite 单表 `metrics(timestamp, cpu_percent, mem_percent, disks_json, net_in_bytes, net_out_bytes)`
 - 只保留最近 7 天数据（配置可调），自动清理
+- 表结构演进用 `PRAGMA table_info` + `ALTER TABLE ADD COLUMN` 做轻量迁移（里程碑 2 加了内存已用/总量 GB）
+
+### 3.3 可视化（里程碑 2，app.py + static/）
+- 本地 ECharts（离线可用）+ 深色监控风单页仪表盘
+- 实时卡片（3 秒轮询）+ 时间范围切换（实时/1h/24h/7d，范围越大刷新越慢）
+- **服务端抽稀聚合**：7 天分钟级约 12 万条原始数据，按时间桶取均值压缩到 300 个点再下发，前端不卡顿（面试点）
 
 ### 3.3 告警（里程碑 3）
 - 三级：P0（CPU>95% 持续 2 次采样）、P1（内存>90%）、P2（磁盘>85%）

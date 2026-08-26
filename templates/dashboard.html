@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>服务器监控仪表盘</title>
+  <link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⬢</span>
+      <h1>服务器监控仪表盘</h1>
+      <span class="status">
+        <span id="status-dot" class="dot"></span><span id="status-text">连接中…</span>
+      </span>
+    </div>
+    <div class="controls">
+      <div class="range-btns" id="range-btns">
+        <button data-range="realtime" class="active">实时</button>
+        <button data-range="1h">1 小时</button>
+        <button data-range="24h">24 小时</button>
+        <button data-range="7d">7 天</button>
+      </div>
+      <span class="updated">最后更新 <span id="last-update">--</span></span>
+    </div>
+  </header>
+
+  <main>
+    <!-- 实时指标卡片 -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">CPU 使用率</div>
+        <div class="kpi-value" id="kpi-cpu">--<span class="unit">%</span></div>
+        <div class="bar"><div class="bar-fill" id="bar-cpu"></div></div>
+        <div class="kpi-sub" id="sub-cpu">--</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">内存使用率</div>
+        <div class="kpi-value" id="kpi-mem">--<span class="unit">%</span></div>
+        <div class="bar"><div class="bar-fill" id="bar-mem"></div></div>
+        <div class="kpi-sub" id="sub-mem">--</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">磁盘使用率（最高分区）</div>
+        <div class="kpi-value" id="kpi-disk">--<span class="unit">%</span></div>
+        <div class="bar"><div class="bar-fill" id="bar-disk"></div></div>
+        <div class="kpi-sub" id="sub-disk">--</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">网络速率（↓ 入 / ↑ 出）</div>
+        <div class="kpi-value" id="kpi-net">--</div>
+        <div class="bar bar-hidden"><div class="bar-fill"></div></div>
+        <div class="kpi-sub" id="sub-net">--</div>
+      </div>
+    </section>
+
+    <!-- 主趋势图 -->
+    <section class="chart-card">
+      <div class="chart-title">
+        CPU / 内存趋势
+        <span class="chart-caption" id="main-caption"></span>
+      </div>
+      <div id="chart-main" class="chart chart-main"></div>
+    </section>
+
+    <!-- 网络 + 磁盘 -->
+    <section class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">网络速率（B/s）</div>
+        <div id="chart-net" class="chart"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">磁盘分区使用率（%）</div>
+        <div id="chart-disk" class="chart"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/echarts.min.js"></script>
+  <script src="/static/dashboard.js"></script>
+</body>
+</html>

@@ -22,8 +22,10 @@ class Collector:
         # CPU：interval=1 表示 psutil 内部采样 1 秒后返回均值
         cpu_percent = psutil.cpu_percent(interval=1.0)
 
-        # 内存
+        # 内存（百分比 + 已用/总量 GB，供仪表盘展示）
         mem = psutil.virtual_memory()
+        mem_used_gb = round(mem.used / (1024 ** 3), 1)
+        mem_total_gb = round(mem.total / (1024 ** 3), 1)
 
         # 磁盘：遍历所有分区
         disks = {}
@@ -49,6 +51,8 @@ class Collector:
             "timestamp": now,
             "cpu_percent": round(cpu_percent, 1),
             "mem_percent": round(mem.percent, 1),
+            "mem_used_gb": mem_used_gb,
+            "mem_total_gb": mem_total_gb,
             "disks": disks,
             "net_in_bytes": round(net_in_rate, 1),
             "net_out_bytes": round(net_out_rate, 1),

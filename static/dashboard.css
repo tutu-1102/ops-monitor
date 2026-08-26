@@ -1,0 +1,79 @@
+/* 服务器监控仪表盘 —— 深色监控风 */
+:root {
+  --bg: #0b1220;
+  --card: #131c2e;
+  --border: #1e293b;
+  --text: #e2e8f0;
+  --sub: #94a3b8;
+  --cyan: #22d3ee;
+  --green: #34d399;
+  --yellow: #fbbf24;
+  --red: #f87171;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: radial-gradient(1200px 600px at 20% -10%, #16233f 0%, var(--bg) 55%);
+  color: var(--text);
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  min-height: 100vh;
+}
+
+/* ===== 顶栏 ===== */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo { color: var(--cyan); font-size: 22px; }
+.brand h1 { font-size: 18px; font-weight: 600; }
+.status { display: flex; align-items: center; gap: 6px; color: var(--sub); font-size: 12px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #64748b; }
+.dot.ok { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+.dot.err { background: var(--red); }
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+.controls { display: flex; align-items: center; gap: 16px; }
+.range-btns { display: flex; gap: 2px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
+.range-btns button {
+  background: transparent; border: none; color: var(--sub);
+  padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
+}
+.range-btns button:hover { color: var(--text); }
+.range-btns button.active { background: rgba(34, 211, 238, 0.14); color: var(--cyan); }
+.updated { font-size: 12px; color: var(--sub); }
+
+/* ===== 主体 ===== */
+main {
+  padding: 20px 24px 32px;
+  display: flex; flex-direction: column; gap: 16px;
+  max-width: 1400px; margin: 0 auto; width: 100%;
+}
+
+/* ===== KPI 卡片 ===== */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.kpi-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.kpi-label { color: var(--sub); font-size: 13px; margin-bottom: 8px; }
+.kpi-value { font-size: 30px; font-weight: 700; line-height: 1.1; }
+.kpi-value .unit { font-size: 15px; font-weight: 400; color: var(--sub); margin-left: 2px; }
+.bar { height: 6px; background: #0f172a; border-radius: 3px; margin: 12px 0 8px; overflow: hidden; }
+.bar-hidden { visibility: hidden; margin: 9px 0 5px; }
+.bar-fill { height: 100%; width: 0; border-radius: 3px; background: #64748b; transition: width 0.6s ease, background-color 0.6s ease; }
+.kpi-sub { color: var(--sub); font-size: 12px; min-height: 16px; }
+
+/* ===== 图表卡片 ===== */
+.chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.chart-title { display: flex; align-items: center; gap: 10px; font-size: 14px; margin-bottom: 8px; }
+.chart-caption { margin-left: auto; font-size: 12px; color: var(--sub); }
+.chart { height: 300px; width: 100%; }
+.chart-main { height: 360px; }
+.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+@media (max-width: 900px) {
+  .chart-row { grid-template-columns: 1fr; }
+  .topbar { flex-direction: column; align-items: flex-start; gap: 10px; }
+}
