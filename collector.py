@@ -6,6 +6,7 @@
 - 磁盘按分区采集（可能有多个盘/挂载点）
 - 网络速率 = 两次采集的字节数差值 / 时间差
 """
+import os
 import time
 import psutil
 
@@ -47,6 +48,42 @@ def snapshot_top_procs(n: int = 5, interval: float = 0.3) -> list:
     ]
 
 
+# ===== 磁盘挂载点过滤 =====
+# 面试点：容器里 psutil.disk_partitions() 返回的是"容器视角"的挂载点，
+# 会混入大量虚拟文件系统（overlay/tmpfs/proc 等）和 WSL2 内部路径，
+# 这些不是宿主机真实分区，直接监控会刷出假告警（如只读层永远 100%）。
+# 因此采集前过滤两类：
+#   1) 虚拟/伪文件系统（fstype 黑名单）
+#   2) 单文件 bind 挂载（挂载点是文件而非目录，如容器里的 /etc/resolv.conf）
+_PSEUDO_FSTYPES = {
+    # 容器/内核虚拟文件系统
+    "overlay", "tmpfs", "devtmpfs", "squashfs", "proc", "sysfs",
+    "cgroup", "cgroup2", "devpts", "mqueue", "ramfs", "shm",
+    "securityfs", "debugfs", "tracefs", "pstore", "bpf", "configfs",
+    "fusectl", "hugetlbfs", "binfmt_misc", "autofs", "nsfs", "rootfs",
+    "fuse", "fuse.gvfsd-fuse",
+    # 只读镜像文件系统（ISO/光盘镜像，永远 100%，不反映真实磁盘）
+    "iso9660", "udf",
+    # WSL2 挂载 Windows 盘的虚拟文件系统（非真实块设备，Docker Desktop 场景）
+    "9p", "drvfs",
+}
+
+
+def _is_pseudo_mount(part) -> bool:
+    """判断挂载点是否为"伪"挂载（虚拟/只读镜像文件系统、loop 回环设备或单文件 bind），应排除在磁盘监控外。"""
+    fstype = (part.fstype or "").lower()
+    if fstype in _PSEUDO_FSTYPES:
+        return True
+    # loop 回环设备：挂载的是镜像文件（如 WSL2 的 cli-tools ISO），只读、永远满
+    device = (part.device or "")
+    if device.startswith("/dev/loop"):
+        return True
+    # 单文件 bind 挂载：挂载点是一个文件（如 /etc/resolv.conf），不是分区
+    if os.path.isfile(part.mountpoint):
+        return True
+    return False
+
+
 class Collector:
     def __init__(self):
         self._last_net = None   # 上次网络计数
@@ -64,9 +101,11 @@ class Collector:
         mem_used_gb = round(mem.used / (1024 ** 3), 1)
         mem_total_gb = round(mem.total / (1024 ** 3), 1)
 
-        # 磁盘：遍历所有分区
+        # 磁盘：遍历真实分区，过滤虚拟文件系统与单文件 bind 挂载
         disks = {}
         for part in psutil.disk_partitions():
+            if _is_pseudo_mount(part):
+                continue
             try:
                 usage = psutil.disk_usage(part.mountpoint)
                 disks[part.mountpoint] = round(usage.percent, 1)
