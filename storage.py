@@ -45,9 +45,14 @@ def _connect():
             peak_value REAL,            -- 告警期间峰值
             started_at REAL NOT NULL,
             ended_at REAL,              -- NULL 表示尚未恢复
-            notified INTEGER DEFAULT 0
+            notified INTEGER DEFAULT 0,
+            top_procs TEXT              -- 告警触发时 top 进程快照 JSON（里程碑 4 新增）
         )
     """)
+    # 轻量迁移：旧库 alerts 表缺 top_procs 列时补齐（里程碑 4）
+    alert_cols = {row[1] for row in conn.execute("PRAGMA table_info(alerts)")}
+    if "top_procs" not in alert_cols:
+        conn.execute("ALTER TABLE alerts ADD COLUMN top_procs TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_started ON alerts(started_at)")
     return conn
 
@@ -174,16 +179,18 @@ def _alert_from_row(r) -> dict:
         "peak_value": r[5],
         "started_at": r[6],
         "ended_at": r[7],
+        "top_procs": json.loads(r[8]) if len(r) > 8 and r[8] else [],
     }
 
 
-def create_alert(level, metric, target, threshold, peak_value) -> int:
-    """新告警入库，返回告警 id。"""
+def create_alert(level, metric, target, threshold, peak_value, top_procs=None) -> int:
+    """新告警入库，返回告警 id。top_procs 为触发时进程快照（可空）。"""
     conn = _connect()
     cur = conn.execute(
-        "INSERT INTO alerts (level, metric, target, threshold, peak_value, started_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (level, metric, target, threshold, peak_value, time.time()),
+        "INSERT INTO alerts (level, metric, target, threshold, peak_value, started_at, top_procs) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (level, metric, target, threshold, peak_value, time.time(),
+         json.dumps(top_procs, ensure_ascii=False) if top_procs else None),
     )
     conn.commit()
     alert_id = cur.lastrowid
@@ -214,7 +221,7 @@ def active_alerts() -> list:
     """当前未恢复的告警。"""
     conn = _connect()
     rows = conn.execute(
-        "SELECT id, level, metric, target, threshold, peak_value, started_at, ended_at "
+        "SELECT id, level, metric, target, threshold, peak_value, started_at, ended_at, top_procs "
         "FROM alerts WHERE ended_at IS NULL ORDER BY started_at DESC"
     ).fetchall()
     conn.close()
@@ -225,7 +232,7 @@ def recent_alerts(limit: int = 50) -> list:
     """最近 limit 条告警记录（含已恢复），新→旧。"""
     conn = _connect()
     rows = conn.execute(
-        "SELECT id, level, metric, target, threshold, peak_value, started_at, ended_at "
+        "SELECT id, level, metric, target, threshold, peak_value, started_at, ended_at, top_procs "
         "FROM alerts ORDER BY started_at DESC LIMIT ?", (limit,)
     ).fetchall()
     conn.close()

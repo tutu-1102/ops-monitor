@@ -101,7 +101,7 @@ class Notifier:
             server.quit()
 
 
-def build_alert_message(level, metric_label, target, value, threshold, hostname, ts) -> tuple:
+def build_alert_message(level, metric_label, target, value, threshold, hostname, ts, top_procs=None) -> tuple:
     """组装告警/恢复通知的标题与正文（钉钉 markdown / 邮件纯文本通用）。"""
     title = f"🚨 [{level}] 告警触发: {metric_label}"
     lines = [
@@ -110,6 +110,10 @@ def build_alert_message(level, metric_label, target, value, threshold, hostname,
         f"**当前值**: {value}%  (阈值 {threshold}%)",
         f"**时间**: {fmt_time(ts)}",
     ]
+    if top_procs:
+        lines.append("**高负载进程**:")
+        lines += [f"  {i}. {p['name']} (PID {p['pid']}) — {p['cpu']}%"
+                  for i, p in enumerate(top_procs, 1)]
     return title, "\n\n".join(lines) + "\n"
 
 

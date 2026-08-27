@@ -13,6 +13,7 @@ import socket
 import time
 
 import config
+import collector
 import notify
 import storage
 
@@ -94,11 +95,21 @@ class AlertEngine:
         st["firing"] = True
         st["peak"] = value
         st["started_at"] = time.time()
-        st["alert_id"] = storage.create_alert(level, metric_name, target, threshold, value)
+
+        # 里程碑 4：CPU 高负载告警触发时抓 top 进程快照，记录"元凶"便于事后排查
+        top_procs = None
+        if metric_name == "cpu_percent":
+            try:
+                top_procs = collector.snapshot_top_procs(n=5)
+            except Exception as e:
+                print(f"[告警引擎] 进程快照失败（不影响告警）: {e}", flush=True)
+
+        st["alert_id"] = storage.create_alert(
+            level, metric_name, target, threshold, value, top_procs)
 
         title, text = notify.build_alert_message(
             level, METRIC_LABELS[metric_name], target, value, threshold,
-            self.hostname, st["started_at"],
+            self.hostname, st["started_at"], top_procs,
         )
         channels = self.notifier.send(title, text)
         print(f"[告警引擎] 触发 {level} {METRIC_LABELS[metric_name]}"

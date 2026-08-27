@@ -10,6 +10,43 @@ import time
 import psutil
 
 
+def snapshot_top_procs(n: int = 5, interval: float = 0.3) -> list:
+    """抓取当前 CPU 占用最高的 n 个进程快照（告警触发时调用，事后排查用）。
+
+    面试要点：
+    - 告警不只是告诉你"出事了"，还要告诉你"是谁干的"——快照记录元凶
+    - psutil 的 cpu_percent 第一次调用返回 0（只有基线），需先建立基线、
+      sleep 一小段再取第二次，才是真实占用
+    - 只在告警触发的"边沿"抓一次，不在每次采集都抓，避免额外开销
+    """
+    procs = []
+    for p in psutil.process_iter(['pid', 'name']):
+        try:
+            p.cpu_percent(interval=None)  # 第一次调用建立基线
+            procs.append(p)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    time.sleep(interval)  # 让出时间，第二次调用才得到真实占用
+
+    rows = []
+    for p in procs:
+        try:
+            info = p.info
+            cpu = p.cpu_percent(interval=None)
+            rows.append((cpu, info['pid'], info['name']))
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    # 先过滤掉空闲进程（PID 0 的空闲不是元凶），再排序取前 n
+    rows = [r for r in rows if r[1] != 0 and r[2] != "System Idle Process"]
+    rows.sort(reverse=True)
+    return [
+        {"pid": pid, "name": name, "cpu": round(cpu, 1)}
+        for cpu, pid, name in rows[:n]
+    ]
+
+
 class Collector:
     def __init__(self):
         self._last_net = None   # 上次网络计数
