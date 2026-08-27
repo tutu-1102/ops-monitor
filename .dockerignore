@@ -1,0 +1,13 @@
+# .dockerignore — build 时排除不进镜像的文件（减小镜像体积、避免泄露敏感信息）
+.git
+.gitignore
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+data/
+docs/
+*.md
+docker-compose.yml
+Dockerfile

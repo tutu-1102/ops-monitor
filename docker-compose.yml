@@ -1,0 +1,29 @@
+# docker-compose.yml — 一键编排（比手敲 docker run 更专业，面试常问）
+#
+# 用法：
+#   docker compose up -d --build   # 构建并后台启动
+#   docker compose logs -f         # 看日志
+#   docker compose down            # 停止
+#
+# 面试要点：
+# - restart: unless-stopped → 服务器重启后容器自动拉起（相当于 systemd 守护）
+# - volumes 把宿主机 ./data 挂到容器 /app/data，SQLite 数据持久化
+# - healthcheck 让 Docker 探活：连不上 5000 端口就标记 unhealthy，可配合编排自愈
+
+services:
+  ops-monitor:
+    build: .
+    container_name: ops-monitor
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TZ=Asia/Shanghai
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/metrics/latest', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
