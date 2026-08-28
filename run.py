@@ -8,6 +8,7 @@
 里程碑 6（多节点）：本机作为「中心端 + 本机节点」，后台线程采集本机指标
 （node=hostname）直接入库并判定；其他节点通过 agent.py 上报到 /api/ingest。
 """
+import os
 import socket
 import threading
 import time
@@ -21,7 +22,7 @@ import storage
 def collect_loop():
     """后台采集线程：每隔 COLLECT_INTERVAL 秒采集本机、入库、告警检查。"""
     c = collector.Collector()
-    node = socket.gethostname()   # 本机节点标识
+    node = os.environ.get("NODE_NAME") or socket.gethostname()   # 本机节点标识（可被 NODE_NAME 环境变量覆盖，容器内保持稳定）
     # 复用中心端唯一告警引擎（与 agent 上报共用，状态按 node 隔离）
     engine = webapp.engine
     # 首次采集用于初始化网络速率基线（不准确，直接丢弃）
