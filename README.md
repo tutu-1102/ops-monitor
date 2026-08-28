@@ -66,7 +66,8 @@ flowchart LR
 - [x] 里程碑 3：阈值告警（分级 P0/P1/P2 + 钉钉/邮件 + 状态机降噪 + 重启自愈）
 - [x] 里程碑 4：实战细节（CPU 高负载进程快照 ✅ / 压测演练脚本 ✅ / 磁盘自动清理 ⏸ 搁置）
 - [x] 里程碑 5：Docker 化 + 部署文档（容器化 ✅ / 云服务器上线 ⏳ 找工作前 1~2 个月）
-- [ ] 里程碑 6：技术博客 + 简历包装 + 面试预演
+- [x] 里程碑 6（多节点监控）：agent 主动上报 + 中心端聚合 + 告警按节点隔离 + 仪表盘节点切换
+- [ ] 里程碑 7：技术博客 + 简历包装 + 面试预演
 
 ## 仪表盘
 
@@ -77,6 +78,41 @@ flowchart LR
 - 图表：CPU 与内存双曲线、网络收发流量、磁盘各分区柱状图
 - 时间范围切换：实时（10 分钟窗口）/ 1 小时 / 24 小时 / 7 天
 - **服务端抽稀聚合**：7 天约 12 万条原始数据按时间桶取均值压缩到 300 个点再下发，前端不卡顿
+
+## 多节点监控（里程碑 6）
+
+架构从「单机 push」升级为「agent 主动上报 + 中心端聚合」，对标 Zabbix agent / Prometheus exporter：
+
+```mermaid
+flowchart LR
+    subgraph 被监控节点
+        A1[agent.py<br/>web-01]
+        A2[agent.py<br/>db-01]
+        A3[run.py 本机采集<br/>DESKTOP-xxx]
+    end
+    subgraph 中心端
+        ING[/api/ingest<br/>上报入口/]
+        DB[(SQLite<br/>按 node 存储)]
+        AL[告警引擎<br/>按 node 隔离]
+        NT[钉钉/邮件/控制台]
+        W[Flask API + 仪表盘]
+    end
+
+    A1 -->|POST 指标| ING
+    A2 -->|POST 指标| ING
+    A3 -->|直写| DB
+    ING --> DB
+    DB --> AL --> NT
+    DB --> W
+```
+
+- **agent.py**：轻量上报进程，复用 collector 采集逻辑，标准库 urllib POST 到 `/api/ingest`（不引入 requests）
+- **中心端统一判定告警**：告警规则集中管理、通知统一出口；状态机按 `(node, level, metric, target)` 隔离，不同节点同类告警互不干扰
+- **数据模型加 node 维度**：metrics / alerts 表加 `node` 列，所有 API 支持 `?node=` 过滤
+- **仪表盘节点切换**：顶栏下拉选择节点（或全部），指标卡片/曲线/告警全部联动
+- 启动：`python agent.py --server http://中心端:5000 --node web-01 --interval 5`
+
+> 面试延伸：中心端单点（中心端挂了告警也没了）→ 引出高可用 / 分布式话题。
 
 ## 告警功能
 
@@ -115,7 +151,9 @@ python run.py
 
 | 接口 | 说明 |
 |------|------|
-| `GET /api/metrics/latest` | 最新一条指标（含内存已用/总量 GB、磁盘各分区） |
+| `POST /api/ingest` | agent 上报入口，接收 `{node, metric}` |
+| `GET /api/nodes` | 所有已知节点列表（含最近活跃时间/条数） |
+| `GET /api/metrics/latest` | 最新一条指标（含内存已用/总量 GB、磁盘各分区），可按 `?node=` 过滤 |
 | `GET /api/metrics/history?limit=N` | 最近 N 条原始记录（默认 500，上限 5000） |
 | `GET /api/metrics/range?minutes=N&max_points=M` | 最近 N 分钟聚合序列，超过 M 个点按时间桶取均值抽稀 |
 | `GET /api/alerts/active` | 当前未恢复的告警 |
@@ -126,6 +164,7 @@ python run.py
 ```
 ops-monitor/
 ├─ run.py            # 启动入口（后台采集线程 + 告警检查 + Web 服务）
+├─ agent.py          # 多节点监控 agent（上报本机指标到中心端，里程碑 6）
 ├─ config.py         # 配置（采集周期、告警阈值、通知渠道、数据路径）
 ├─ collector.py      # 指标采集器（psutil + 进程快照 + 伪挂载点过滤）
 ├─ storage.py        # SQLite 存储（指标 + 告警历史，含时间桶聚合抽稀）
