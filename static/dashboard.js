@@ -18,6 +18,7 @@
   const CARD_REFRESH = 3000; // 卡片刷新周期（毫秒）
 
   let currentRange = 'realtime';
+  let currentNode = null;   // null = 全部节点
   let chartTimer = null;
 
   // ===== 工具函数 =====
@@ -54,6 +55,36 @@
     const r = await fetch(url);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
+  }
+
+  function nodeParam() { return currentNode ? ('&node=' + encodeURIComponent(currentNode)) : ''; }
+
+  // ===== 节点切换 =====
+  async function loadNodes() {
+    try {
+      const nodes = await fetchJson('/api/nodes');
+      const sel = document.getElementById('node-select');
+      const prev = currentNode;
+      let html = '<option value="">全部节点</option>';
+      nodes.forEach((n) => {
+        html += '<option value="' + esc(n.node) + '">' + esc(n.node) + '</option>';
+      });
+      sel.innerHTML = html;
+      if (prev) { const exists = nodes.some((n) => n.node === prev); sel.value = exists ? prev : ''; }
+      currentNode = sel.value || null;
+      refreshAll();
+    } catch (e) { /* 节点列表加载失败不影响指标展示 */ }
+  }
+
+  document.getElementById('node-select').addEventListener('change', (e) => {
+    currentNode = e.target.value || null;
+    refreshAll();
+  });
+
+  function refreshAll() {
+    loadLatest();
+    loadRange();
+    loadAlerts();
   }
 
   // ===== 图表初始化 =====
@@ -223,6 +254,11 @@
     return base + (a.target ? ' (' + a.target + ')' : '');
   }
 
+  function nodeTag(a) {
+    return (a.node && a.node !== 'local')
+      ? '<span class="node-chip">' + esc(a.node) + '</span>' : '';
+  }
+
   function procsHtml(procs) {
     if (!procs || procs.length === 0) return '';
     const items = procs.map((p) =>
@@ -251,6 +287,7 @@
         + '<div class="alert-item-main">'
         + '<span class="level-badge ' + a.level.toLowerCase() + '">' + a.level + '</span>'
         + '<span>' + alertLabel(a) + ' 峰值 ' + a.peak_value + '%（阈值 ' + a.threshold + '%）</span>'
+        + nodeTag(a)
         + '<span class="alert-meta">开始于 ' + fmtDateTime(a.started_at) + ' · 已持续 ' + fmtDuration(dur) + '</span>'
         + '</div>'
         + procsHtml(a.top_procs)
@@ -273,7 +310,7 @@
       return '<div class="alert-row-wrap">'
         + '<div class="alert-row">'
         + '<span class="level-badge ' + a.level.toLowerCase() + '">' + a.level + '</span>'
-        + '<span>' + alertLabel(a) + ' · 峰值 ' + a.peak_value + '% / 阈值 ' + a.threshold + '%</span>'
+        + '<span>' + alertLabel(a) + ' · 峰值 ' + a.peak_value + '% / 阈值 ' + a.threshold + '%' + nodeTag(a) + '</span>'
         + '<span class="alert-time">' + fmtDateTime(a.started_at) + ' ~ ' + (active ? '持续中' : fmtDateTime(a.ended_at)) + '</span>'
         + '<span class="alert-status ' + (active ? 'active' : 'ok') + '">' + (active ? '● 告警中' : '● 已恢复') + '</span>'
         + '</div>'
@@ -285,8 +322,8 @@
   async function loadAlerts() {
     try {
       const results = await Promise.all([
-        fetchJson('/api/alerts/active'),
-        fetchJson('/api/alerts?limit=10'),
+        fetchJson('/api/alerts/active' + (currentNode ? ('?node=' + encodeURIComponent(currentNode)) : '')),
+        fetchJson('/api/alerts?limit=10' + nodeParam()),
       ]);
       renderActive(results[0]);
       renderHistory(results[1]);
@@ -298,7 +335,7 @@
   // ===== 轮询 =====
   async function loadLatest() {
     try {
-      const d = await fetchJson('/api/metrics/latest');
+      const d = await fetchJson('/api/metrics/latest' + (currentNode ? ('?node=' + encodeURIComponent(currentNode)) : ''));
       renderCards(d);
       renderDisk(d.disks || {});
       setStatus(true);
@@ -310,7 +347,7 @@
   async function loadRange() {
     try {
       const cfg = RANGES[currentRange];
-      const d = await fetchJson('/api/metrics/range?minutes=' + cfg.minutes + '&max_points=300');
+      const d = await fetchJson('/api/metrics/range?minutes=' + cfg.minutes + '&max_points=300' + nodeParam());
       renderRange(d);
     } catch (e) {
       document.getElementById('main-caption').textContent = '数据加载失败';
@@ -333,6 +370,8 @@
   });
 
   // ===== 启动 =====
+  loadNodes();
+  setInterval(loadNodes, 15000); // 每 15s 刷新节点列表（发现新上线节点）
   loadLatest();
   setInterval(loadLatest, CARD_REFRESH);
   loadAlerts();

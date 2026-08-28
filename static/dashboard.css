@@ -38,6 +38,16 @@ body {
 @keyframes pulse { 50% { opacity: 0.35; } }
 
 .controls { display: flex; align-items: center; gap: 16px; }
+.node-box { display: flex; align-items: center; gap: 6px; }
+.node-label { font-size: 12px; color: var(--sub); }
+.node-box select {
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 10px; font-size: 13px; cursor: pointer;
+  max-width: 180px; outline: none;
+}
+.node-box select:hover { border-color: var(--cyan); }
+.node-box select:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.15); }
 .range-btns { display: flex; gap: 2px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
 .range-btns button {
   background: transparent; border: none; color: var(--sub);
@@ -100,6 +110,12 @@ main {
 
 .level-badge {
   font-weight: 700; font-size: 12px; padding: 2px 9px; border-radius: 5px; flex-shrink: 0;
+}
+.node-chip {
+  display: inline-flex; align-items: center;
+  background: rgba(34, 211, 238, 0.10); border: 1px solid rgba(34, 211, 238, 0.35);
+  color: var(--cyan); border-radius: 5px; padding: 1px 7px;
+  font-size: 11px; margin-left: 6px; white-space: nowrap;
 }
 .level-badge.p0 { background: #f87171; color: #0b1220; }
 .level-badge.p1 { background: #fbbf24; color: #0b1220; }

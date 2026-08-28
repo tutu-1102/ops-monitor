@@ -25,14 +25,16 @@ def _connect():
             mem_total_gb REAL,
             disks TEXT,                     -- 磁盘各分区 JSON
             net_in_bytes REAL,
-            net_out_bytes REAL
+            net_out_bytes REAL,
+            node TEXT DEFAULT 'local'       -- 来源节点（多节点监控，里程碑 6 新增）
         )
     """)
     # 旧库迁移：早期版本的表缺新列，用 ALTER TABLE 补齐（SQLite 轻量迁移）
     cols = {row[1] for row in conn.execute("PRAGMA table_info(metrics)")}
-    for col in ("mem_used_gb", "mem_total_gb"):
+    for col, ddl in (("mem_used_gb", "REAL"), ("mem_total_gb", "REAL"),
+                     ("node", "TEXT DEFAULT 'local'")):
         if col not in cols:
-            conn.execute(f"ALTER TABLE metrics ADD COLUMN {col} REAL")
+            conn.execute(f"ALTER TABLE metrics ADD COLUMN {col} {ddl}")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_ts ON metrics(ts)")
     # 告警历史表（里程碑 3）
     conn.execute("""
@@ -46,23 +48,26 @@ def _connect():
             started_at REAL NOT NULL,
             ended_at REAL,              -- NULL 表示尚未恢复
             notified INTEGER DEFAULT 0,
-            top_procs TEXT              -- 告警触发时 top 进程快照 JSON（里程碑 4 新增）
+            top_procs TEXT,             -- 告警触发时 top 进程快照 JSON（里程碑 4 新增）
+            node TEXT DEFAULT 'local'   -- 来源节点（里程碑 6 新增）
         )
     """)
-    # 轻量迁移：旧库 alerts 表缺 top_procs 列时补齐（里程碑 4）
+    # 轻量迁移：旧库 alerts 表缺新列时补齐
     alert_cols = {row[1] for row in conn.execute("PRAGMA table_info(alerts)")}
     if "top_procs" not in alert_cols:
         conn.execute("ALTER TABLE alerts ADD COLUMN top_procs TEXT")
+    if "node" not in alert_cols:
+        conn.execute("ALTER TABLE alerts ADD COLUMN node TEXT DEFAULT 'local'")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_started ON alerts(started_at)")
     return conn
 
 
-def save(metric: dict):
-    """保存一次采集结果。"""
+def save(metric: dict, node: str = "local"):
+    """保存一次采集结果（node 为来源节点标识）。"""
     conn = _connect()
     conn.execute(
         "INSERT INTO metrics (ts, cpu_percent, mem_percent, mem_used_gb, mem_total_gb, "
-        "disks, net_in_bytes, net_out_bytes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "disks, net_in_bytes, net_out_bytes, node) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             metric["timestamp"],
             metric["cpu_percent"],
@@ -72,6 +77,7 @@ def save(metric: dict):
             json.dumps(metric["disks"]),
             metric["net_in_bytes"],
             metric["net_out_bytes"],
+            node,
         ),
     )
     conn.commit()
@@ -87,14 +93,21 @@ def cleanup():
     conn.close()
 
 
-def recent(limit: int = 500) -> list:
-    """取最近 limit 条记录（时间正序）。"""
+def recent(limit: int = 500, node: str = None) -> list:
+    """取最近 limit 条记录（时间正序），可按 node 过滤。"""
     conn = _connect()
-    rows = conn.execute(
-        "SELECT ts, cpu_percent, mem_percent, mem_used_gb, mem_total_gb, "
-        "disks, net_in_bytes, net_out_bytes "
-        "FROM metrics ORDER BY ts DESC LIMIT ?", (limit,)
-    ).fetchall()
+    if node:
+        rows = conn.execute(
+            "SELECT ts, cpu_percent, mem_percent, mem_used_gb, mem_total_gb, "
+            "disks, net_in_bytes, net_out_bytes, node "
+            "FROM metrics WHERE node = ? ORDER BY ts DESC LIMIT ?", (node, limit)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT ts, cpu_percent, mem_percent, mem_used_gb, mem_total_gb, "
+            "disks, net_in_bytes, net_out_bytes, node "
+            "FROM metrics ORDER BY ts DESC LIMIT ?", (limit,)
+        ).fetchall()
     conn.close()
 
     result = []
@@ -108,11 +121,12 @@ def recent(limit: int = 500) -> list:
             "disks": json.loads(r[5]) if r[5] else {},
             "net_in_bytes": r[6],
             "net_out_bytes": r[7],
+            "node": r[8],
         })
     return result
 
 
-def aggregate_range(start: float, end: float, max_points: int = 300) -> dict:
+def aggregate_range(start: float, end: float, max_points: int = 300, node: str = None) -> dict:
     """取 [start, end] 时间范围内的聚合序列，超过 max_points 时按时间桶抽稀。
 
     面试要点：
@@ -120,10 +134,16 @@ def aggregate_range(start: float, end: float, max_points: int = 300) -> dict:
     - 服务端按时间桶取均值（桶内多取平均、桶间保持趋势），图表只画 max_points 个点
     """
     conn = _connect()
-    rows = conn.execute(
-        "SELECT ts, cpu_percent, mem_percent, net_in_bytes, net_out_bytes "
-        "FROM metrics WHERE ts BETWEEN ? AND ? ORDER BY ts", (start, end)
-    ).fetchall()
+    if node:
+        rows = conn.execute(
+            "SELECT ts, cpu_percent, mem_percent, net_in_bytes, net_out_bytes "
+            "FROM metrics WHERE node = ? AND ts BETWEEN ? AND ? ORDER BY ts", (node, start, end)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT ts, cpu_percent, mem_percent, net_in_bytes, net_out_bytes "
+            "FROM metrics WHERE ts BETWEEN ? AND ? ORDER BY ts", (start, end)
+        ).fetchall()
     conn.close()
 
     series = {"ts": [], "cpu": [], "mem": [], "net_in": [], "net_out": []}
@@ -179,18 +199,19 @@ def _alert_from_row(r) -> dict:
         "peak_value": r[5],
         "started_at": r[6],
         "ended_at": r[7],
-        "top_procs": json.loads(r[8]) if len(r) > 8 and r[8] else [],
+        "node": r[8] if len(r) > 8 else "local",
+        "top_procs": json.loads(r[9]) if len(r) > 9 and r[9] else [],
     }
 
 
-def create_alert(level, metric, target, threshold, peak_value, top_procs=None) -> int:
-    """新告警入库，返回告警 id。top_procs 为触发时进程快照（可空）。"""
+def create_alert(level, metric, target, threshold, peak_value, top_procs=None, node="local") -> int:
+    """新告警入库，返回告警 id。top_procs 为触发时进程快照（可空），node 为来源节点。"""
     conn = _connect()
     cur = conn.execute(
-        "INSERT INTO alerts (level, metric, target, threshold, peak_value, started_at, top_procs) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO alerts (level, metric, target, threshold, peak_value, started_at, top_procs, node) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (level, metric, target, threshold, peak_value, time.time(),
-         json.dumps(top_procs, ensure_ascii=False) if top_procs else None),
+         json.dumps(top_procs, ensure_ascii=False) if top_procs else None, node),
     )
     conn.commit()
     alert_id = cur.lastrowid
@@ -217,23 +238,46 @@ def close_alert(alert_id: int, ended_at: float):
     conn.close()
 
 
-def active_alerts() -> list:
-    """当前未恢复的告警。"""
+def active_alerts(node: str = None) -> list:
+    """当前未恢复的告警（可按 node 过滤）。"""
     conn = _connect()
-    rows = conn.execute(
-        "SELECT id, level, metric, target, threshold, peak_value, started_at, ended_at, top_procs "
-        "FROM alerts WHERE ended_at IS NULL ORDER BY started_at DESC"
-    ).fetchall()
+    if node:
+        rows = conn.execute(
+            "SELECT id, level, metric, target, threshold, peak_value, started_at, ended_at, node, top_procs "
+            "FROM alerts WHERE ended_at IS NULL AND node = ? ORDER BY started_at DESC", (node,)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id, level, metric, target, threshold, peak_value, started_at, ended_at, node, top_procs "
+            "FROM alerts WHERE ended_at IS NULL ORDER BY started_at DESC"
+        ).fetchall()
     conn.close()
     return [_alert_from_row(r) for r in rows]
 
 
-def recent_alerts(limit: int = 50) -> list:
-    """最近 limit 条告警记录（含已恢复），新→旧。"""
+def recent_alerts(limit: int = 50, node: str = None) -> list:
+    """最近 limit 条告警记录（含已恢复），新→旧（可按 node 过滤）。"""
     conn = _connect()
-    rows = conn.execute(
-        "SELECT id, level, metric, target, threshold, peak_value, started_at, ended_at, top_procs "
-        "FROM alerts ORDER BY started_at DESC LIMIT ?", (limit,)
-    ).fetchall()
+    if node:
+        rows = conn.execute(
+            "SELECT id, level, metric, target, threshold, peak_value, started_at, ended_at, node, top_procs "
+            "FROM alerts WHERE node = ? ORDER BY started_at DESC LIMIT ?", (node, limit)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id, level, metric, target, threshold, peak_value, started_at, ended_at, node, top_procs "
+            "FROM alerts ORDER BY started_at DESC LIMIT ?", (limit,)
+        ).fetchall()
     conn.close()
     return [_alert_from_row(r) for r in rows]
+
+
+def list_nodes() -> list:
+    """返回所有已知节点（按最近活跃排序），供仪表盘切换节点。"""
+    conn = _connect()
+    rows = conn.execute(
+        "SELECT node, MAX(ts) AS last_ts, COUNT(*) AS cnt "
+        "FROM metrics GROUP BY node ORDER BY last_ts DESC"
+    ).fetchall()
+    conn.close()
+    return [{"node": r[0], "last_ts": r[1], "count": r[2]} for r in rows]
