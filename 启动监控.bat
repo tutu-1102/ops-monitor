@@ -1,53 +1,52 @@
 @echo off
-chcp 65001 >nul
-title è¿ç»´ç›‘æŽ§ç³»ç»Ÿ - å¯åŠ¨å™¨
+title ÔËÎ¬¼à¿ØÏµÍ³ - Æô¶¯Æ÷
 echo ============================================
-echo   è¿ç»´ç›‘æŽ§ç³»ç»Ÿ (ops-monitor) å¯åŠ¨å™¨
+echo   ÔËÎ¬¼à¿ØÏµÍ³ (ops-monitor) Æô¶¯Æ÷
 echo ============================================
 echo.
 
-REM è¿›å…¥é¡¹ç›®ç›®å½•
+REM ½øÈëÏîÄ¿Ä¿Â¼
 cd /d "D:\DeepSeek\ops-monitor"
 
-REM æ£€æŸ¥ Docker å¼•æ“Žæ˜¯å¦è¿è¡Œ
+REM ¼ì²é Docker ÒýÇæÊÇ·ñÔËÐÐ
 docker info >nul 2>&1
 if errorlevel 1 (
-    echo [é”™è¯¯] Docker å¼•æ“Žæœªè¿è¡Œï¼Œæ­£åœ¨å°è¯•å¯åŠ¨ Docker Desktop...
+    echo [´íÎó] Docker ÒýÇæÎ´ÔËÐÐ£¬ÕýÔÚ³¢ÊÔÆô¶¯ Docker Desktop...
     start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
-    echo è¯·ç­‰å¾… Docker Desktop å®Œå…¨å¯åŠ¨ï¼ˆå³ä¸‹è§’é²¸é±¼å›¾æ ‡ä¸å†è½¬åœˆï¼‰åŽï¼Œå†åŒå‡»æœ¬æ–‡ä»¶ä¸€æ¬¡ã€‚
+    echo ÇëµÈ´ý Docker Desktop ÍêÈ«Æô¶¯£¨ÓÒÏÂ½Ç¾¨ÓãÍ¼±ê²»ÔÙ×ªÈ¦£©ºó£¬ÔÙË«»÷±¾ÎÄ¼þÒ»´Î¡£
     echo.
     pause
     exit /b 1
 )
 
-echo [1/4] Docker å¼•æ“Žå·²å°±ç»ª
+echo [1/4] Docker ÒýÇæÒÑ¾ÍÐ÷
 
-REM æ£€æŸ¥æ˜¯å¦å·²æœ‰æ—§å®¹å™¨åœ¨è·‘ï¼ˆé¿å…ç«¯å£å†²çªï¼‰
+REM ¼ì²éÊÇ·ñÒÑÓÐ¾ÉÈÝÆ÷ÔÚÅÜ£¨±ÜÃâ¶Ë¿Ú³åÍ»£©
 docker ps --filter "name=ops-monitor" --format "{{.Names}}" | findstr /C:"ops-monitor" >nul
 if %errorlevel%==0 (
-    echo [æç¤º] æ£€æµ‹åˆ°å·²æœ‰ ops-monitor å®¹å™¨åœ¨è¿è¡Œï¼Œç›´æŽ¥æ‰“å¼€ç•Œé¢...
+    echo [ÌáÊ¾] ¼ì²âµ½ÒÑÓÐ ops-monitor ÈÝÆ÷ÔÚÔËÐÐ£¬Ö±½Ó´ò¿ª½çÃæ...
     goto open
 )
 
-echo [2/4] æž„å»ºå¹¶å¯åŠ¨å®¹å™¨ï¼ˆé¦–æ¬¡éœ€ä¸‹è½½é•œåƒï¼Œè¯·è€å¿ƒç­‰å¾…ï¼‰...
+echo [2/4] ¹¹½¨²¢Æô¶¯ÈÝÆ÷£¨Ê×´ÎÐèÏÂÔØ¾µÏñ£¬ÇëÄÍÐÄµÈ´ý£©...
 docker compose up -d --build
 if errorlevel 1 (
     echo.
-    echo [é”™è¯¯] å¯åŠ¨å¤±è´¥ï¼Œè¯·æŠŠä¸Šé¢çš„æŠ¥é”™ä¿¡æ¯æˆªå›¾ç»™ AI æŽ’æŸ¥ã€‚
+    echo [´íÎó] Æô¶¯Ê§°Ü£¬Çë°ÑÉÏÃæµÄ±¨´íÐÅÏ¢½ØÍ¼¸ø AI ÅÅ²é¡£
     pause
     exit /b 1
 )
 
-echo [3/4] ç­‰å¾…æœåŠ¡å°±ç»ª...
+echo [3/4] µÈ´ý·þÎñ¾ÍÐ÷...
 timeout /t 8 /nobreak >nul
 
 :open
-echo [4/4] æ‰“å¼€ç›‘æŽ§é¢æ¿ http://localhost:5000
+echo [4/4] ´ò¿ª¼à¿ØÃæ°å http://localhost:5000
 start "" http://localhost:5000
 echo.
 echo ============================================
-echo   å¯åŠ¨å®Œæˆï¼æµè§ˆå™¨å·²æ‰“å¼€ç›‘æŽ§é¢æ¿ã€‚
-echo   å¦‚éœ€åœæ­¢æœåŠ¡ï¼šåœ¨é¡¹ç›®ç›®å½•è¿è¡Œ docker compose down
+echo   Æô¶¯Íê³É£¡ä¯ÀÀÆ÷ÒÑ´ò¿ª¼à¿ØÃæ°å¡£
+echo   ÈçÐèÍ£Ö¹·þÎñ£ºÔÚÏîÄ¿Ä¿Â¼ÔËÐÐ docker compose down
 echo ============================================
 echo.
 timeout /t 5 /nobreak >nul

@@ -1,8 +1,7 @@
 @echo off
-chcp 65001 >nul
-title è¿ç»´ç›‘æŽ§ç³»ç»Ÿ - åœæ­¢å™¨
+title ÔËÎ¬¼à¿ØÏµÍ³ - Í£Ö¹Æ÷
 echo ============================================
-echo   è¿ç»´ç›‘æŽ§ç³»ç»Ÿ (ops-monitor) åœæ­¢å™¨
+echo   ÔËÎ¬¼à¿ØÏµÍ³ (ops-monitor) Í£Ö¹Æ÷
 echo ============================================
 echo.
 
@@ -10,13 +9,13 @@ cd /d "D:\DeepSeek\ops-monitor"
 
 docker ps --filter "name=ops-monitor" --format "{{.Names}}" | findstr /C:"ops-monitor" >nul
 if %errorlevel%==1 (
-    echo [æç¤º] å½“å‰æ²¡æœ‰æ­£åœ¨è¿è¡Œçš„ ops-monitor å®¹å™¨ã€‚
+    echo [ÌáÊ¾] µ±Ç°Ã»ÓÐÕýÔÚÔËÐÐµÄ ops-monitor ÈÝÆ÷¡£
     timeout /t 3 /nobreak >nul
     exit /b 0
 )
 
-echo æ­£åœ¨åœæ­¢å®¹å™¨ï¼ˆæ•°æ®ä¿ç•™åœ¨ data ç›®å½•ï¼Œä¸ä¼šä¸¢å¤±ï¼‰...
+echo ÕýÔÚÍ£Ö¹ÈÝÆ÷£¨Êý¾Ý±£ÁôÔÚ data Ä¿Â¼£¬²»»á¶ªÊ§£©...
 docker compose down
 echo.
-echo å·²åœæ­¢ã€‚
+echo ÒÑÍ£Ö¹¡£
 timeout /t 3 /nobreak >nul
