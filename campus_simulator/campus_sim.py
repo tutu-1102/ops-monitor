@@ -17,11 +17,19 @@
 """
 import argparse
 import json
+import os
 import random
 import sys
 import time
 import urllib.error
 import urllib.request
+
+# 本程序独立放在 campus_simulator/ 子目录；共享的楼栋/指标目录 campus_config.py 在上一级。
+# 无论从哪个工作目录启动，都能据本文件位置找到它；若将来整体拷出、并把 campus_config 放在
+# 本目录旁，普通 import 也能命中——生成器与监控本体仅通过这一只读配置和 HTTP 接口耦合。
+_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PARENT not in sys.path:
+    sys.path.insert(0, _PARENT)
 
 import campus_config
 
