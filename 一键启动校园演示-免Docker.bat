@@ -1,14 +1,13 @@
 @echo off
-chcp 65001 >nul
 cd /d "%~dp0"
-echo [1/3] å¯åŠ¨ç›‘æŽ§æœåŠ¡ï¼ˆæ–°çª—å£ï¼Œå…Dockerï¼‰...
-start "ops-monitor æœåŠ¡" cmd /k py run.py
+echo [1/3] Æô¶¯¼à¿Ø·þÎñ£¨ÐÂ´°¿Ú£¬ÃâDocker£©...
+start "ops-monitor ·þÎñ" cmd /k py run.py
 timeout /t 5 /nobreak >nul
-echo [2/3] å¯åŠ¨æ ¡å›­æ•°æ®ç”Ÿæˆå™¨ï¼ˆç‹¬ç«‹æ¨¡å—ï¼Œæ–°çª—å£ï¼‰...
-start "campus_sim ç”Ÿæˆå™¨" cmd /k py "%~dp0campus_simulator\campus_sim.py" --interval 1
+echo [2/3] Æô¶¯Ð£Ô°Êý¾ÝÉú³ÉÆ÷£¨¶ÀÁ¢Ä£¿é£¬ÐÂ´°¿Ú£©...
+start "campus_sim Éú³ÉÆ÷" cmd /k py "%~dp0campus_simulator\campus_sim.py" --interval 1
 timeout /t 3 /nobreak >nul
-echo [3/3] æ‰“å¼€æ ¡å›­æ•°å­—å­ªç”Ÿä»ªè¡¨ç›˜...
+echo [3/3] ´ò¿ªÐ£Ô°Êý×ÖÂÏÉúÒÇ±íÅÌ...
 start "" "http://localhost:5000/campus"
 echo.
-echo å·²å…¨éƒ¨å¯åŠ¨ã€‚åœæ­¢æ—¶å…³é—­å¼¹å‡ºçš„ä¸¤ä¸ªé»‘è‰²çª—å£å³å¯ã€‚
+echo ÒÑÈ«²¿Æô¶¯¡£Í£Ö¹Ê±¹Ø±Õµ¯³öµÄÁ½¸öºÚÉ«´°¿Ú¼´¿É¡£
 timeout /t 4 /nobreak >nul
