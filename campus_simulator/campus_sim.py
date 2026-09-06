@@ -93,6 +93,7 @@ class CampusSimulator:
         self.temp_state = {}
         self.ok = 0
         self.fail = 0
+        self.conn_down = False        # 监控服务是否处于连不上的状态（用于只提示一次、恢复时报喜）
 
     @property
     def is_weekend(self):
@@ -192,6 +193,7 @@ class CampusSimulator:
         self._update_faults()
         t = self.clock
         firing = sorted({n for (n, _k) in self.faults})
+        round_ok = 0
         for node in NODE_IDS:
             curve = campus_config.building_curve(node)
             people = self._people(curve, node, t)
@@ -201,16 +203,25 @@ class CampusSimulator:
             try:
                 if self._post(node, payload):
                     self.ok += 1
+                    round_ok += 1
                 else:
                     self.fail += 1
             except (urllib.error.URLError, TimeoutError, OSError) as e:
+                # 连接级失败对所有楼都一样：每轮只提示一次、不逐楼刷屏、不逐楼 sleep，静默等待服务起来
                 self.fail += 1
-                print(f"[生成器] 上报失败({node}): {e} —— 请确认 ops-monitor 已启动(py run.py)", flush=True)
-                time.sleep(1.0)
+                if not self.conn_down:
+                    self.conn_down = True
+                    reason = getattr(e, "reason", e)
+                    print(f"[生成器] 暂时连不上监控服务({self.url})：{reason}", flush=True)
+                    print("[生成器] 请先双击上级目录的「启动监控-免Docker.bat」；本程序会每轮自动重连，无需重启。", flush=True)
+                return  # 本轮不再逐楼重试，下一轮自然重连
+        if self.conn_down:
+            self.conn_down = False
+            print("[生成器] 已重新连上监控服务，恢复数据上报。", flush=True)
         hh = int(t) % 24
         mm = int((t - int(t)) * 60)
         wk = "周末" if self.is_weekend else "工作日"
-        print(f"[生成器] {wk} 虚拟时刻 {hh:02d}:{mm:02d} | 本轮 10 楼已上报 | 成功 {self.ok} 失败 {self.fail}"
+        print(f"[生成器] {wk} 虚拟时刻 {hh:02d}:{mm:02d} | 本轮 {round_ok} 楼已上报 | 成功 {self.ok} 失败 {self.fail}"
               + (f" | 故障楼: {','.join(firing)}" if firing else ""), flush=True)
 
     def run(self):
