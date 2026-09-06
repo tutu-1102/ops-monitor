@@ -1,0 +1,59 @@
+/* 校园数字孪生模块专属样式（独立于主机 dashboard.css，不影响原页面） */
+.nav-link {
+  color: #9fd0ff; text-decoration: none; font-size: 14px;
+  padding: 6px 12px; border: 1px solid rgba(255,255,255,.25); border-radius: 8px;
+}
+.nav-link:hover { background: rgba(255,255,255,.08); }
+
+.campus-zone { margin-bottom: 18px; }
+.zone-title {
+  font-size: 15px; font-weight: 600; color: #cfe3ff; margin: 6px 2px 10px;
+  letter-spacing: 1px;
+}
+.building-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+.b-card {
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.10);
+  border-left: 4px solid #4caf8d; border-radius: 10px; padding: 12px 14px; cursor: pointer;
+  transition: transform .12s ease, background .12s ease;
+}
+.b-card:hover { background: rgba(255,255,255,.09); transform: translateY(-1px); }
+.b-card.selected { outline: 2px solid #69b4ff; }
+.b-card.st-warn { border-left-color: #faad14; }
+.b-card.st-crit { border-left-color: #ea6668; animation: pulse 1.2s infinite; }
+.b-card.offline { opacity: .55; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 rgba(234,102,104,0);} 50%{box-shadow:0 0 10px rgba(234,102,104,.55);} }
+
+.b-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.b-name { font-size: 15px; font-weight: 600; color: #eef4ff; }
+.b-dot { width: 9px; height: 9px; border-radius: 50%; background: #4caf8d; }
+.b-dot.off { background: #7a8290; }
+
+.b-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+.b-m { display: flex; justify-content: space-between; font-size: 12.5px; }
+.b-m .ml { color: #aebbd0; }
+.b-m .mv { font-variant-numeric: tabular-nums; color: #eef4ff; }
+.b-m .mv.warn { color: #faad14; }
+.b-m .mv.crit { color: #ea6668; font-weight: 700; }
+
+.chart-trend { height: 360px; }
+
+/* 校园告警列表条目 */
+#campus-alert-list .alert-item {
+  flex-direction: row; align-items: center; gap: 12px; margin-bottom: 6px;
+}
+#campus-alert-list .alert-item.warn {
+  background: rgba(251,191,36,.08); border-color: rgba(251,191,36,.45);
+}
+#campus-alert-list .alert-item.crit {
+  background: rgba(248,113,113,.10); border-color: rgba(248,113,113,.45);
+}
+.alert-level {
+  font-weight: 700; font-size: 12px; padding: 2px 9px; border-radius: 5px; flex-shrink: 0;
+  background: #fbbf24; color: #0b1220;
+}
+.alert-item.crit .alert-level { background: #f87171; }
+#campus-alert-list .alert-item > span:nth-child(2) { flex: 1; }
+

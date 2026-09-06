@@ -59,6 +59,31 @@ def _connect():
     if "node" not in alert_cols:
         conn.execute("ALTER TABLE alerts ADD COLUMN node TEXT DEFAULT 'local'")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_started ON alerts(started_at)")
+
+    # ===== 校园数字孪生（独立模块：通用 key-value 业务指标，与主机 metrics 表隔离）=====
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS campus_metrics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts REAL NOT NULL,               -- 采集时间戳
+            node TEXT NOT NULL,             -- 楼号（对应 Unity 建筑对象名，如 North_Teaching）
+            data TEXT NOT NULL              -- 该楼本次 4 个指标的 JSON：{key: value}
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_campus_ts ON campus_metrics(ts)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_campus_node_ts ON campus_metrics(node, ts)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS campus_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            level TEXT NOT NULL,            -- P1(预警) / P0(严重)
+            metric TEXT NOT NULL,           -- occupancy / power / temp / network
+            threshold REAL,
+            peak_value REAL,
+            started_at REAL NOT NULL,
+            ended_at REAL,
+            node TEXT NOT NULL
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_campus_alerts_started ON campus_alerts(started_at)")
     return conn
 
 
@@ -89,6 +114,8 @@ def cleanup():
     cutoff = time.time() - config.RETENTION_DAYS * 86400
     conn = _connect()
     conn.execute("DELETE FROM metrics WHERE ts < ?", (cutoff,))
+    # 校园模块沿用同一保留期
+    conn.execute("DELETE FROM campus_metrics WHERE ts < ?", (cutoff,))
     conn.commit()
     conn.close()
 
@@ -281,3 +308,110 @@ def list_nodes() -> list:
     ).fetchall()
     conn.close()
     return [{"node": r[0], "last_ts": r[1], "count": r[2]} for r in rows]
+
+
+# ======================================================================
+# 校园数字孪生模块（独立存取，与主机监控互不影响）
+# ======================================================================
+def save_campus(ts: float, node: str, data: dict):
+    """保存一栋楼一次采样（data 为 {指标key: 值}）。"""
+    conn = _connect()
+    conn.execute(
+        "INSERT INTO campus_metrics (ts, node, data) VALUES (?, ?, ?)",
+        (ts, node, json.dumps(data, ensure_ascii=False)),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _campus_row(r):
+    return {"timestamp": r[0], "id": r[1], "node": r[1],
+            "metrics": json.loads(r[2]) if r[2] else {}}
+
+
+def latest_campus_all() -> list:
+    """每栋楼最近一条采样（按 node 分组取最大 ts），返回时间新→旧的列表。"""
+    conn = _connect()
+    rows = conn.execute(
+        "SELECT cm.ts, cm.node, cm.data FROM campus_metrics cm "
+        "JOIN (SELECT node, MAX(ts) AS m FROM campus_metrics GROUP BY node) g "
+        "ON cm.node = g.node AND cm.ts = g.m ORDER BY cm.ts DESC"
+    ).fetchall()
+    conn.close()
+    return [_campus_row(r) for r in rows]
+
+
+def recent_campus(node: str, limit: int = 300) -> list:
+    """某栋楼最近 limit 条，时间正序（供画趋势曲线）。"""
+    conn = _connect()
+    rows = conn.execute(
+        "SELECT ts, node, data FROM campus_metrics WHERE node = ? "
+        "ORDER BY ts DESC LIMIT ?", (node, limit)
+    ).fetchall()
+    conn.close()
+    return [_campus_row(r) for r in reversed(rows)]
+
+
+# ---- 校园告警（独立表 campus_alerts，状态机见 campus_alert.py）----
+def create_campus_alert(level, metric, threshold, peak_value, node) -> int:
+    conn = _connect()
+    cur = conn.execute(
+        "INSERT INTO campus_alerts (level, metric, threshold, peak_value, started_at, node) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (level, metric, threshold, peak_value, time.time(), node),
+    )
+    conn.commit()
+    aid = cur.lastrowid
+    conn.close()
+    return aid
+
+
+def update_campus_alert_peak(alert_id, peak_value):
+    conn = _connect()
+    conn.execute("UPDATE campus_alerts SET peak_value = MAX(peak_value, ?) WHERE id = ?",
+                 (peak_value, alert_id))
+    conn.commit()
+    conn.close()
+
+
+def close_campus_alert(alert_id, ended_at):
+    conn = _connect()
+    conn.execute("UPDATE campus_alerts SET ended_at = ? WHERE id = ?", (ended_at, alert_id))
+    conn.commit()
+    conn.close()
+
+
+def _campus_alert_row(r):
+    return {"id": r[0], "level": r[1], "metric": r[2], "threshold": r[3],
+            "peak_value": r[4], "started_at": r[5], "ended_at": r[6], "node": r[7]}
+
+
+def active_campus_alerts(node: str = None) -> list:
+    """当前未恢复的校园告警。"""
+    conn = _connect()
+    if node:
+        rows = conn.execute(
+            "SELECT id, level, metric, threshold, peak_value, started_at, ended_at, node "
+            "FROM campus_alerts WHERE ended_at IS NULL AND node = ? ORDER BY started_at DESC",
+            (node,)).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id, level, metric, threshold, peak_value, started_at, ended_at, node "
+            "FROM campus_alerts WHERE ended_at IS NULL ORDER BY started_at DESC").fetchall()
+    conn.close()
+    return [_campus_alert_row(r) for r in rows]
+
+
+def recent_campus_alerts(limit: int = 50, node: str = None) -> list:
+    conn = _connect()
+    if node:
+        rows = conn.execute(
+            "SELECT id, level, metric, threshold, peak_value, started_at, ended_at, node "
+            "FROM campus_alerts WHERE node = ? ORDER BY started_at DESC LIMIT ?",
+            (node, limit)).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id, level, metric, threshold, peak_value, started_at, ended_at, node "
+            "FROM campus_alerts ORDER BY started_at DESC LIMIT ?", (limit,)).fetchall()
+    conn.close()
+    return [_campus_alert_row(r) for r in rows]

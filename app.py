@@ -5,8 +5,10 @@ import time
 from flask import Flask, jsonify, render_template, request
 import storage
 import alert
+from campus_api import campus_bp  # 校园数字孪生模块（独立 Blueprint，与主机监控解耦）
 
 app = Flask(__name__)
+app.register_blueprint(campus_bp)  # 挂载 /api/campus/* 与 /campus 页面
 
 # 中心端唯一告警引擎：本机采集线程（run.py）与 agent 上报（/api/ingest）共用，
 # 状态机按 node 隔离，各节点告警互不干扰。

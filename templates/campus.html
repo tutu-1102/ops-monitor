@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>校园数字孪生 · 实时态势</title>
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="/static/campus.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⬢</span>
+      <h1>校园数字孪生 · 实时态势</h1>
+      <span class="status">
+        <span id="status-dot" class="dot"></span><span id="status-text">连接中…</span>
+      </span>
+    </div>
+    <div class="controls">
+      <a class="nav-link" href="/">服务器监控</a>
+      <span class="updated">最后更新 <span id="last-update">--</span></span>
+    </div>
+  </header>
+
+  <main>
+    <section id="alert-banner" class="alert-banner hidden"></section>
+
+    <section class="campus-zone">
+      <h2 class="zone-title">北区</h2>
+      <div class="building-grid" id="grid-north"></div>
+    </section>
+
+    <section class="campus-zone">
+      <h2 class="zone-title">南区</h2>
+      <div class="building-grid" id="grid-south"></div>
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-title">
+        <span id="detail-title">点击任意楼宇查看趋势</span>
+        <span class="chart-caption" id="detail-caption"></span>
+      </div>
+      <div id="chart-trend" class="chart chart-trend"></div>
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-title">最近校园告警</div>
+      <div id="campus-alert-list" class="alert-list">
+        <div class="alert-empty">暂无告警记录</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/echarts.min.js"></script>
+  <script src="/static/campus.js"></script>
+</body>
+</html>
