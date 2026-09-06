@@ -1,13 +1,13 @@
 @echo off
 chcp 65001 >nul
-cd /d "D:\DeepSeek\ops-monitor"
+cd /d "%~dp0"
 title campus_sim 校园数据生成器
 echo ============================================================
-echo   校园模拟数据生成器：每 2 秒向监控服务上报 10 栋楼数据
-echo   请先启动“启动监控-免Docker.bat”
-echo   可选倍速参数： py campus_sim.py --speed 120 （2分钟过1小时）
-echo   Ctrl+C 停止
+echo   每 1~2 秒向监控服务上报 10 栋楼数据（请先启动监控服务）
+echo   Ctrl+C 停止；倍速演示: py campus_sim.py --speed 120
 echo ============================================================
 echo.
-py campus_sim.py %*
+py campus_sim.py --interval 1 %*
+echo.
+echo ** 生成器已退出，若上方有报错请截图发给我 **
 pause
