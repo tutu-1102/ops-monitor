@@ -4,3 +4,7 @@ data/
 .venv/
 venv/
 .env
+
+_p0_test*.log
+data/*.log
+

@@ -123,6 +123,7 @@ flowchart LR
 - 通知渠道可插拔：钉钉机器人 Webhook + SMTP 邮件，未配置时自动降级为控制台输出
 - **重启自愈**：进程重启后从数据库恢复未结束的告警，不重复发、还能继续等恢复
 - 演练工具：`python scripts/trigger_test.py`（喂假数据端到端验证全链路）
+- **校园数字孪生告警同样接钉钉**：标题带 `[校园]`，只在触发/恢复边沿推送；`.env` 里 `CAMPUS_NOTIFY=0` 可关（生成器压测防刷屏）；演练 `py scripts/trigger_campus_test.py`
 
 ## 快速开始
 

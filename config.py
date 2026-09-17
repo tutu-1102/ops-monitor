@@ -56,6 +56,8 @@ SMTP_PORT = int(_env("SMTP_PORT", "465") or 465)
 SMTP_USER = _env("SMTP_USER")
 SMTP_PASSWORD = _env("SMTP_PASSWORD")                 # QQ邮箱为授权码
 ALERT_EMAIL_TO = [x for x in _env("ALERT_EMAIL_TO").split(",") if x.strip()]
+# 校园数字孪生告警是否走同一套通知渠道（生成器压测时可设 0 关掉，避免刷屏）
+CAMPUS_NOTIFY = _env("CAMPUS_NOTIFY", "1") not in ("0", "false", "False", "")
 
 # ===== Web =====
 WEB_HOST = _env("WEB_HOST", "0.0.0.0")

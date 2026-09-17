@@ -7,8 +7,12 @@
   var chart = null;
   var STATUS_CLS = ["", "warn", "crit"];
   var LEVEL_TXT = { P0: "严重", P1: "预警" };
+  var MISSING = -99999;
 
   function $(id) { return document.getElementById(id); }
+  function isMissing(v) {
+    return v === null || v === undefined || v <= MISSING + 1;
+  }
   function fmtTime(ts) {
     if (!ts) return "--";
     var d = new Date(ts * 1000);
@@ -16,12 +20,12 @@
   }
   function metricLabel(k) { return META && META[k] ? META[k].label : k; }
   function fmtVal(k, v) {
-    if (v === null || v === undefined) return "--";
+    if (isMissing(v)) return "--";
     var m = META[k]; var d = m ? m.decimals : 1;
     return Number(v).toFixed(d) + (m ? " " + m.unit : "");
   }
   function norm(k, v) {
-    var m = META[k]; if (!m || v === null || v === undefined) return null;
+    var m = META[k]; if (!m || isMissing(v)) return null;
     var span = m.max - m.min; return span ? ((v - m.min) / span) * 100 : 0;
   }
 
@@ -60,7 +64,7 @@
 
   function stOf(n, k) {
     var m = META[k], v = n[k];
-    if (!m || v === null || v === undefined) return 0;
+    if (!m || isMissing(v)) return 0;
     if (v >= m.critical) return 2;
     if (v >= m.warn) return 1;
     return 0;

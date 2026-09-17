@@ -1,59 +1,141 @@
-/* 校园数字孪生模块专属样式（独立于主机 dashboard.css，不影响原页面） */
-.nav-link {
-  color: #9fd0ff; text-decoration: none; font-size: 14px;
-  padding: 6px 12px; border: 1px solid rgba(255,255,255,.25); border-radius: 8px;
+/* 校园数字孪生：继承 dashboard 的 shadcn 卡片体系，本文件只补楼宇卡片 */
+.nav-link,
+a.nav-btn,
+a[href="/campus"],
+a[href="/"] {
+  color: #fafafa;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border: 1px solid var(--border, #27272a);
+  border-radius: 8px;
+  background: var(--card, #121214);
 }
-.nav-link:hover { background: rgba(255,255,255,.08); }
+.nav-link:hover,
+a.nav-btn:hover {
+  background: var(--muted, #27272a);
+}
 
-.campus-zone { margin-bottom: 18px; }
+.campus-zone { margin-bottom: 8px; }
 .zone-title {
-  font-size: 15px; font-weight: 600; color: #cfe3ff; margin: 6px 2px 10px;
-  letter-spacing: 1px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #a1a1aa;
+  margin: 4px 2px 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .building-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
 }
 .b-card {
-  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.10);
-  border-left: 4px solid #4caf8d; border-radius: 10px; padding: 12px 14px; cursor: pointer;
-  transition: transform .12s ease, background .12s ease;
+  background: var(--card, #121214);
+  border: 1px solid var(--border, #27272a);
+  border-radius: var(--radius, 12px);
+  padding: 14px 16px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,.25);
+  transition: transform .12s ease, background .12s ease, border-color .12s ease;
+  position: relative;
 }
-.b-card:hover { background: rgba(255,255,255,.09); transform: translateY(-1px); }
-.b-card.selected { outline: 2px solid #69b4ff; }
-.b-card.st-warn { border-left-color: #faad14; }
-.b-card.st-crit { border-left-color: #ea6668; animation: pulse 1.2s infinite; }
-.b-card.offline { opacity: .55; }
-@keyframes pulse { 0%,100%{box-shadow:0 0 0 rgba(234,102,104,0);} 50%{box-shadow:0 0 10px rgba(234,102,104,.55);} }
+.b-card:hover {
+  background: #18181b;
+  border-color: #3f3f46;
+  transform: translateY(-1px);
+}
+.b-card.selected {
+  outline: 2px solid #a1a1aa;
+  outline-offset: 1px;
+}
+.b-card.st-warn { border-color: rgba(234, 179, 8, 0.6); }
+.b-card.st-warn::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, #eab308, #fde047 50%, transparent 85%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.85;
+  animation: borderBeamGlow 2.8s linear infinite;
+}
+.b-card.st-crit {
+  border-color: rgba(248, 113, 113, 0.6);
+  animation: pulse 1.2s infinite;
+}
+.b-card.st-crit::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, #eab308, #fde047 60%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.95;
+  animation: borderBeamGlow 2.2s linear infinite;
+}
+.b-card.offline { opacity: 0.55; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(234,102,104,0); }
+  50% { box-shadow: 0 0 12px rgba(234,102,104,.4); }
+}
 
-.b-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.b-name { font-size: 15px; font-weight: 600; color: #eef4ff; }
-.b-dot { width: 9px; height: 9px; border-radius: 50%; background: #4caf8d; }
-.b-dot.off { background: #7a8290; }
+.b-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.b-name { font-size: 14px; font-weight: 600; color: #fafafa; letter-spacing: -0.01em; }
+.b-dot { width: 8px; height: 8px; border-radius: 50%; background: #34d399; }
+.b-dot.off { background: #52525b; }
 
 .b-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
-.b-m { display: flex; justify-content: space-between; font-size: 12.5px; }
-.b-m .ml { color: #aebbd0; }
-.b-m .mv { font-variant-numeric: tabular-nums; color: #eef4ff; }
-.b-m .mv.warn { color: #faad14; }
-.b-m .mv.crit { color: #ea6668; font-weight: 700; }
+.b-m { display: flex; justify-content: space-between; font-size: 12px; }
+.b-m .ml { color: #a1a1aa; }
+.b-m .mv {
+  font-variant-numeric: tabular-nums;
+  color: #fafafa;
+  font-weight: 500;
+}
+.b-m .mv.warn { color: #fbbf24; }
+.b-m .mv.crit { color: #f87171; font-weight: 700; }
 
 .chart-trend { height: 360px; }
 
-/* 校园告警列表条目 */
 #campus-alert-list .alert-item {
-  flex-direction: row; align-items: center; gap: 12px; margin-bottom: 6px;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
 }
 #campus-alert-list .alert-item.warn {
-  background: rgba(251,191,36,.08); border-color: rgba(251,191,36,.45);
+  background: rgba(251, 191, 36, 0.07);
+  border-color: rgba(251, 191, 36, 0.4);
 }
 #campus-alert-list .alert-item.crit {
-  background: rgba(248,113,113,.10); border-color: rgba(248,113,113,.45);
+  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.4);
 }
 .alert-level {
-  font-weight: 700; font-size: 12px; padding: 2px 9px; border-radius: 5px; flex-shrink: 0;
-  background: #fbbf24; color: #0b1220;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: #fbbf24;
+  color: #18181b;
 }
-.alert-item.crit .alert-level { background: #f87171; }
+.alert-item.crit .alert-level { background: #f87171; color: #fff; }
 #campus-alert-list .alert-item > span:nth-child(2) { flex: 1; }
-

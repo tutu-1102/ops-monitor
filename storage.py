@@ -4,86 +4,110 @@
 面试要点：
 - 为什么 SQLite：单机部署零依赖、数据量小（分钟级）足够
 - 指标以 JSON 文本存磁盘/网络细节，避免为每个分区建表
+- 建表/迁移只在进程内执行一次；每次读写新开短连接 + WAL，避免与多客户端轮询争锁
 """
 import json
 import os
 import sqlite3
+import threading
 import time
+
 import config
+
+_schema_lock = threading.Lock()
+_schema_ready = False
+
+
+def _ensure_schema(conn):
+    """建表与轻量迁移：进程内只跑一次。"""
+    global _schema_ready
+    if _schema_ready:
+        return
+    with _schema_lock:
+        if _schema_ready:
+            return
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts REAL NOT NULL,               -- 采集时间戳
+                cpu_percent REAL,
+                mem_percent REAL,
+                mem_used_gb REAL,               -- 内存已用/总量（GB，里程碑 2 新增）
+                mem_total_gb REAL,
+                disks TEXT,                     -- 磁盘各分区 JSON
+                net_in_bytes REAL,
+                net_out_bytes REAL,
+                node TEXT DEFAULT 'local'       -- 来源节点（多节点监控，里程碑 6 新增）
+            )
+        """)
+        # 旧库迁移：早期版本的表缺新列，用 ALTER TABLE 补齐（SQLite 轻量迁移）
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(metrics)")}
+        for col, ddl in (("mem_used_gb", "REAL"), ("mem_total_gb", "REAL"),
+                         ("node", "TEXT DEFAULT 'local'")):
+            if col not in cols:
+                conn.execute(f"ALTER TABLE metrics ADD COLUMN {col} {ddl}")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ts ON metrics(ts)")
+        # 告警历史表（里程碑 3）
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                level TEXT NOT NULL,        -- P0 / P1 / P2
+                metric TEXT NOT NULL,       -- cpu_percent / mem_percent / disk_percent
+                target TEXT,                -- 磁盘分区挂载点（如 C:\\），其他指标为空
+                threshold REAL,
+                peak_value REAL,            -- 告警期间峰值
+                started_at REAL NOT NULL,
+                ended_at REAL,              -- NULL 表示尚未恢复
+                notified INTEGER DEFAULT 0,
+                top_procs TEXT,             -- 告警触发时 top 进程快照 JSON（里程碑 4 新增）
+                node TEXT DEFAULT 'local'   -- 来源节点（里程碑 6 新增）
+            )
+        """)
+        # 轻量迁移：旧库 alerts 表缺新列时补齐
+        alert_cols = {row[1] for row in conn.execute("PRAGMA table_info(alerts)")}
+        if "top_procs" not in alert_cols:
+            conn.execute("ALTER TABLE alerts ADD COLUMN top_procs TEXT")
+        if "node" not in alert_cols:
+            conn.execute("ALTER TABLE alerts ADD COLUMN node TEXT DEFAULT 'local'")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_started ON alerts(started_at)")
+
+        # ===== 校园数字孪生（独立模块：通用 key-value 业务指标，与主机 metrics 表隔离）=====
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS campus_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts REAL NOT NULL,               -- 采集时间戳
+                node TEXT NOT NULL,             -- 楼号（对应 Unity 建筑对象名，如 North_Teaching）
+                data TEXT NOT NULL              -- 该楼本次 4 个指标的 JSON：{key: value}
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_campus_ts ON campus_metrics(ts)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_campus_node_ts ON campus_metrics(node, ts)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS campus_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                level TEXT NOT NULL,            -- P1(预警) / P0(严重)
+                metric TEXT NOT NULL,           -- occupancy / power / temp / network
+                threshold REAL,
+                peak_value REAL,
+                started_at REAL NOT NULL,
+                ended_at REAL,
+                node TEXT NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_campus_alerts_started ON campus_alerts(started_at)")
+        _schema_ready = True
 
 
 def _connect():
     os.makedirs(os.path.dirname(config.DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(config.DB_PATH)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS metrics (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ts REAL NOT NULL,               -- 采集时间戳
-            cpu_percent REAL,
-            mem_percent REAL,
-            mem_used_gb REAL,               -- 内存已用/总量（GB，里程碑 2 新增）
-            mem_total_gb REAL,
-            disks TEXT,                     -- 磁盘各分区 JSON
-            net_in_bytes REAL,
-            net_out_bytes REAL,
-            node TEXT DEFAULT 'local'       -- 来源节点（多节点监控，里程碑 6 新增）
-        )
-    """)
-    # 旧库迁移：早期版本的表缺新列，用 ALTER TABLE 补齐（SQLite 轻量迁移）
-    cols = {row[1] for row in conn.execute("PRAGMA table_info(metrics)")}
-    for col, ddl in (("mem_used_gb", "REAL"), ("mem_total_gb", "REAL"),
-                     ("node", "TEXT DEFAULT 'local'")):
-        if col not in cols:
-            conn.execute(f"ALTER TABLE metrics ADD COLUMN {col} {ddl}")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ts ON metrics(ts)")
-    # 告警历史表（里程碑 3）
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            level TEXT NOT NULL,        -- P0 / P1 / P2
-            metric TEXT NOT NULL,       -- cpu_percent / mem_percent / disk_percent
-            target TEXT,                -- 磁盘分区挂载点（如 C:\\），其他指标为空
-            threshold REAL,
-            peak_value REAL,            -- 告警期间峰值
-            started_at REAL NOT NULL,
-            ended_at REAL,              -- NULL 表示尚未恢复
-            notified INTEGER DEFAULT 0,
-            top_procs TEXT,             -- 告警触发时 top 进程快照 JSON（里程碑 4 新增）
-            node TEXT DEFAULT 'local'   -- 来源节点（里程碑 6 新增）
-        )
-    """)
-    # 轻量迁移：旧库 alerts 表缺新列时补齐
-    alert_cols = {row[1] for row in conn.execute("PRAGMA table_info(alerts)")}
-    if "top_procs" not in alert_cols:
-        conn.execute("ALTER TABLE alerts ADD COLUMN top_procs TEXT")
-    if "node" not in alert_cols:
-        conn.execute("ALTER TABLE alerts ADD COLUMN node TEXT DEFAULT 'local'")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_started ON alerts(started_at)")
-
-    # ===== 校园数字孪生（独立模块：通用 key-value 业务指标，与主机 metrics 表隔离）=====
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS campus_metrics (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ts REAL NOT NULL,               -- 采集时间戳
-            node TEXT NOT NULL,             -- 楼号（对应 Unity 建筑对象名，如 North_Teaching）
-            data TEXT NOT NULL              -- 该楼本次 4 个指标的 JSON：{key: value}
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_campus_ts ON campus_metrics(ts)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_campus_node_ts ON campus_metrics(node, ts)")
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS campus_alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            level TEXT NOT NULL,            -- P1(预警) / P0(严重)
-            metric TEXT NOT NULL,           -- occupancy / power / temp / network
-            threshold REAL,
-            peak_value REAL,
-            started_at REAL NOT NULL,
-            ended_at REAL,
-            node TEXT NOT NULL
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_campus_alerts_started ON campus_alerts(started_at)")
+    # timeout/busy_timeout：多客户端（采集线程 + Flask + Unity 轮询）下避免 database is locked
+    conn = sqlite3.connect(config.DB_PATH, timeout=30.0)
+    conn.execute("PRAGMA busy_timeout=30000")
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+    except sqlite3.Error:
+        pass
+    _ensure_schema(conn)
     return conn
 
 

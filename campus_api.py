@@ -19,6 +19,10 @@ from campus_alert import CampusAlertEngine
 campus_bp = Blueprint("campus", __name__)
 _engine = CampusAlertEngine()   # 中心端唯一校园告警引擎（与主机 engine 互不干扰）
 
+# Unity MetricDef.MissingMetric：JsonUtility 无法区分 null 与 0，缺指标下发此哨兵
+MISSING_METRIC = -99999.0
+API_VERSION = 1
+
 
 def _worst_status(metrics: dict) -> int:
     worst = 0
@@ -27,6 +31,35 @@ def _worst_status(metrics: dict) -> int:
             continue
         worst = max(worst, campus_config.status_of(k, float(v)))
     return worst
+
+
+def _arg_int(name: str, default: int, lo: int, hi: int) -> int:
+    raw = request.args.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        v = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, v))
+
+
+def _meta_list():
+    """扁平 meta 列表（Unity JsonUtility 可解析；键值字典 meta 仍保留给网页）。"""
+    out = []
+    for k in campus_config.METRIC_ORDER:
+        m = campus_config.METRICS[k]
+        out.append({
+            "key": k,
+            "label": m["label"],
+            "unit": m["unit"],
+            "min": m["min"],
+            "max": m["max"],
+            "warn": m["warn"],
+            "critical": m["critical"],
+            "decimals": m["decimals"],
+        })
+    return out
 
 
 @campus_bp.route("/api/campus/ingest", methods=["POST"])
@@ -81,11 +114,15 @@ def campus_latest():
             "activeAlerts": len(active.get(node, [])),
         }
         # 扁平展开 4 个指标字段（Unity 端用固定 DTO 直接接）
+        # 缺字段/None 下发哨兵 -99999，避免 JsonUtility 把 null 解析成真实 0
         for k in campus_config.METRIC_ORDER:
-            item[k] = metrics.get(k)
+            v = metrics.get(k)
+            item[k] = MISSING_METRIC if v is None else v
         nodes.append(item)
     return jsonify({"serverTime": now,
+                    "apiVersion": API_VERSION,
                     "meta": campus_config.METRICS,
+                    "metaList": _meta_list(),
                     "order": campus_config.METRIC_ORDER,
                     "nodes": nodes})
 
@@ -95,7 +132,7 @@ def campus_history():
     node = request.args.get("node", "")
     if node not in campus_config.BUILDINGS:
         return jsonify({"error": "unknown node"}), 400
-    limit = min(int(request.args.get("limit", 300)), 2000)
+    limit = _arg_int("limit", 300, 1, 2000)
     rows = storage.recent_campus(node, limit)
     return jsonify({"node": node, "rows": rows})
 
@@ -107,7 +144,7 @@ def campus_alerts_active():
 
 @campus_bp.route("/api/campus/alerts")
 def campus_alerts_recent():
-    limit = min(int(request.args.get("limit", 50)), 500)
+    limit = _arg_int("limit", 50, 1, 500)
     return jsonify(storage.recent_campus_alerts(limit=limit, node=request.args.get("node")))
 
 

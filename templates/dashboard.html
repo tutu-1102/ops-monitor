@@ -26,7 +26,7 @@
         <button data-range="24h">24 小时</button>
         <button data-range="7d">7 天</button>
       </div>
-      <a href="/campus" style="color:#9fd0ff;text-decoration:none;font-size:14px;padding:6px 12px;border:1px solid rgba(255,255,255,.25);border-radius:8px;">校园孪生</a>
+      <a class="nav-btn" href="/campus">校园孪生</a>
       <span class="updated">最后更新 <span id="last-update">--</span></span>
     </div>
   </header>
@@ -34,25 +34,25 @@
   <main>
     <!-- 实时指标卡片 -->
     <section class="kpi-grid">
-      <div class="kpi-card">
+      <div class="kpi-card card-beam">
         <div class="kpi-label">CPU 使用率</div>
         <div class="kpi-value" id="kpi-cpu">--<span class="unit">%</span></div>
         <div class="bar"><div class="bar-fill" id="bar-cpu"></div></div>
         <div class="kpi-sub" id="sub-cpu">--</div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card card-beam">
         <div class="kpi-label">内存使用率</div>
         <div class="kpi-value" id="kpi-mem">--<span class="unit">%</span></div>
         <div class="bar"><div class="bar-fill" id="bar-mem"></div></div>
         <div class="kpi-sub" id="sub-mem">--</div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card card-beam">
         <div class="kpi-label">磁盘使用率（最高分区）</div>
         <div class="kpi-value" id="kpi-disk">--<span class="unit">%</span></div>
         <div class="bar"><div class="bar-fill" id="bar-disk"></div></div>
         <div class="kpi-sub" id="sub-disk">--</div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card card-beam">
         <div class="kpi-label">网络速率（↓ 入 / ↑ 出）</div>
         <div class="kpi-value" id="kpi-net">--</div>
         <div class="bar bar-hidden"><div class="bar-fill"></div></div>
@@ -60,11 +60,11 @@
       </div>
     </section>
 
-    <!-- 活跃告警横幅（无告警时隐藏） -->
-    <section id="alert-banner" class="alert-banner hidden"></section>
+    <!-- 活跃告警横幅（无告警时隐藏；有告警时流光为黄色） -->
+    <section id="alert-banner" class="alert-banner card-beam hidden"></section>
 
     <!-- 主趋势图 -->
-    <section class="chart-card">
+    <section class="chart-card card-beam">
       <div class="chart-title">
         CPU / 内存趋势
         <span class="chart-caption" id="main-caption"></span>
@@ -74,18 +74,18 @@
 
     <!-- 网络 + 磁盘 -->
     <section class="chart-row">
-      <div class="chart-card">
+      <div class="chart-card card-beam">
         <div class="chart-title">网络速率（B/s）</div>
         <div id="chart-net" class="chart"></div>
       </div>
-      <div class="chart-card">
+      <div class="chart-card card-beam">
         <div class="chart-title">磁盘分区使用率（%）</div>
         <div id="chart-disk" class="chart"></div>
       </div>
     </section>
 
     <!-- 最近告警 -->
-    <section class="chart-card">
+    <section class="chart-card card-beam">
       <div class="chart-title">
         最近告警
         <span class="chart-caption" id="alert-caption"></span>

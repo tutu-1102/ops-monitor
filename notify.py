@@ -128,3 +128,35 @@ def build_recovery_message(level, metric_label, target, value, duration_sec, hos
         f"**时间**: {fmt_time(ts)}",
     ]
     return title, "\n\n".join(lines) + "\n"
+
+
+def build_campus_alert_message(level, building_name, node, metric_label, unit,
+                               value, threshold, ts) -> tuple:
+    """组装校园数字孪生业务告警通知（钉钉 markdown / 邮件通用）。"""
+    title = f"🚨 [校园][{level}] 告警触发: {building_name}·{metric_label}"
+    level_txt = "严重" if level == "P0" else "预警"
+    lines = [
+        f"**模块**: 校园数字孪生",
+        f"**建筑**: {building_name}（{node}）",
+        f"**级别**: [{level}] {level_txt}",
+        f"**指标**: {metric_label}",
+        f"**当前值**: {value}{unit}  (阈值 {threshold}{unit})",
+        f"**时间**: {fmt_time(ts)}",
+    ]
+    return title, "\n\n".join(lines) + "\n"
+
+
+def build_campus_recovery_message(level, building_name, node, metric_label, unit,
+                                  value, duration_sec, ts) -> tuple:
+    """组装校园数字孪生告警恢复通知。"""
+    title = f"✅ [校园][{level}] 告警恢复: {building_name}·{metric_label}"
+    lines = [
+        f"**模块**: 校园数字孪生",
+        f"**建筑**: {building_name}（{node}）",
+        f"**级别**: [{level}]",
+        f"**指标**: {metric_label}",
+        f"**当前值**: {value}{unit}  (已低于阈值)",
+        f"**持续时长**: {int(duration_sec // 60)} 分 {int(duration_sec % 60)} 秒",
+        f"**时间**: {fmt_time(ts)}",
+    ]
+    return title, "\n\n".join(lines) + "\n"

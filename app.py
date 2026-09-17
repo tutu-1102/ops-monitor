@@ -71,7 +71,11 @@ def api_latest():
 @app.route("/api/metrics/history")
 def api_history():
     """最近 N 条历史（默认 500，可按 ?node= 过滤）。"""
-    limit = min(int(request.args.get("limit", 500)), 5000)
+    try:
+        limit = int(request.args.get("limit", 500))
+    except (TypeError, ValueError):
+        limit = 500
+    limit = min(max(limit, 1), 5000)
     node = request.args.get("node")
     return jsonify(storage.recent(limit=limit, node=node))
 
@@ -87,7 +91,11 @@ def api_range():
     except ValueError:
         minutes = 60
     minutes = min(max(minutes, 1), 60 * 24 * 30)  # 1 分钟 ~ 30 天
-    max_points = min(int(request.args.get("max_points", 300)), 2000)
+    try:
+        max_points = int(request.args.get("max_points", 300))
+    except (TypeError, ValueError):
+        max_points = 300
+    max_points = min(max(max_points, 10), 2000)
     node = request.args.get("node")
 
     end = time.time()
@@ -107,7 +115,11 @@ def api_alerts_active():
 @app.route("/api/alerts")
 def api_alerts():
     """最近 N 条告警记录（含已恢复，可按 ?node= 过滤），默认 50。"""
-    limit = min(int(request.args.get("limit", 50)), 500)
+    try:
+        limit = int(request.args.get("limit", 50))
+    except (TypeError, ValueError):
+        limit = 50
+    limit = min(max(limit, 1), 500)
     return jsonify(storage.recent_alerts(limit=limit, node=request.args.get("node")))
 
 
